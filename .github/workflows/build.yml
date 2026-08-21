@@ -1,0 +1,74 @@
+name: build
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            artifact: snes-emu-linux-x86_64
+            binary: target/release/snes-emu
+          - os: macos-latest
+            artifact: snes-emu-macos-arm64
+            binary: target/release/snes-emu
+          - os: macos-13
+            artifact: snes-emu-macos-x86_64
+            binary: target/release/snes-emu
+          - os: windows-latest
+            artifact: snes-emu-windows-x86_64
+            binary: target/release/snes-emu.exe
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Rust ツールチェーン
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Linux 依存パッケージ
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libasound2-dev \
+            libx11-dev libxcursor-dev libxi-dev \
+            libxkbcommon-dev libwayland-dev libgl1-mesa-dev
+
+      - name: ビルド
+        run: cargo build --release
+
+      - name: テスト
+        run: cargo test --release
+
+      - name: 成果物リネーム
+        shell: bash
+        run: |
+          mkdir -p dist
+          cp "${{ matrix.binary }}" "dist/${{ matrix.artifact }}$([[ '${{ runner.os }}' == 'Windows' ]] && echo .exe || true)"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: dist/*
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*

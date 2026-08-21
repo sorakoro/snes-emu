@@ -1,0 +1,19 @@
+[package]
+name = "snes-emu"
+version = "0.1.0"
+edition = "2021"
+default-run = "snes-emu"
+
+[dependencies]
+minifb = "0.27"
+cpal = "0.15"
+
+[dev-dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+[profile.dev]
+opt-level = 1
+
+[profile.release]
+debug = true
