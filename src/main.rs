@@ -1,5 +1,5 @@
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
-use minifb::{Key, Scale, Window, WindowOptions};
+use minifb::{Key, Scale, ScaleMode, Window, WindowOptions};
 use snes_emu::ppu::{SCREEN_H, SCREEN_W};
 use snes_emu::snes::{self, Snes};
 use std::collections::VecDeque;
@@ -130,6 +130,8 @@ fn main() {
         SCREEN_H,
         WindowOptions {
             scale: Scale::X2,
+            resize: true,
+            scale_mode: ScaleMode::AspectRatioStretch,
             ..WindowOptions::default()
         },
     )

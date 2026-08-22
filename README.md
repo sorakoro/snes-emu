@@ -58,7 +58,8 @@ Linux / macOS (Intel・Apple Silicon) / Windows の4種のバイナリが
 | X | S | L / R | Q / W |
 | Start | Enter | Select | 右 Shift |
 
-ESC で終了。
+ESC で終了。ウィンドウは自由にリサイズ可能 (アスペクト比維持)。
+フルスクリーンは macOS では緑ボタン、Windows/Linux では最大化で。
 
 ## 実装状況
 

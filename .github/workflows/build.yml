@@ -19,9 +19,6 @@ jobs:
           - os: macos-latest
             artifact: snes-emu-macos-arm64
             binary: target/release/snes-emu
-          - os: macos-13
-            artifact: snes-emu-macos-x86_64
-            binary: target/release/snes-emu
           - os: windows-latest
             artifact: snes-emu-windows-x86_64
             binary: target/release/snes-emu.exe
