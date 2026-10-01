@@ -8,7 +8,9 @@ Rust 製スーパーファミコン (SNES) エミュレータ。Windows / macOS 
 cargo run --release -- <ROM ファイル (.sfc/.smc)>
 ```
 
-セーブデータ (SRAM) は ROM と同じ場所に `<ROM名>.srm` として自動保存されます。
+セーブデータ (SRAM) は OS のデータディレクトリに `<ROM名>.srm` として自動保存されます
+(macOS: `~/Library/Application Support/snes-emu/`、Windows: `%APPDATA%\snes-emu\`、
+Linux: `~/.local/share/snes-emu/`)。旧版が ROM の隣に保存した `.srm` も読み込めます。
 
 ## ビルド方法 (OS 別)
 

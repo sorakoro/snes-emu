@@ -117,14 +117,32 @@ fn main() {
         snes.bus.cart.title, snes.bus.cart.map
     );
 
-    // SRAM (セーブデータ) の読み込み: <ROM名>.srm
-    let srm_path = std::path::Path::new(rom_path).with_extension("srm");
+    // SRAM (セーブデータ) は OS のデータディレクトリ配下に <ROM名>.srm として保存する。
+    // 旧版は ROM の隣に置いていたため、読み込みはそちらにもフォールバックする。
+    let legacy_srm_path = std::path::Path::new(rom_path).with_extension("srm");
+    let srm_path = match dirs::data_dir() {
+        Some(dir) => {
+            let dir = dir.join("snes-emu");
+            if let Err(e) = std::fs::create_dir_all(&dir) {
+                eprintln!(
+                    "セーブ用ディレクトリを作成できません ({}): {e}",
+                    dir.display()
+                );
+            }
+            dir.join(legacy_srm_path.file_name().unwrap())
+        }
+        None => legacy_srm_path.clone(),
+    };
     if !snes.bus.cart.sram.is_empty() {
-        if let Ok(data) = std::fs::read(&srm_path) {
+        let loaded = [&srm_path, &legacy_srm_path]
+            .into_iter()
+            .find_map(|p| std::fs::read(p).ok().map(|d| (p, d)));
+        if let Some((path, data)) = loaded {
             let n = data.len().min(snes.bus.cart.sram.len());
             snes.bus.cart.sram[..n].copy_from_slice(&data[..n]);
-            println!("セーブデータ読み込み: {}", srm_path.display());
+            println!("セーブデータ読み込み: {}", path.display());
         }
+        println!("セーブ先: {}", srm_path.display());
     }
 
     let mut window = Window::new(
