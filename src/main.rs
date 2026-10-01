@@ -3,7 +3,10 @@ use minifb::{Key, Scale, ScaleMode, Window, WindowOptions};
 use snes_emu::ppu::{SCREEN_H, SCREEN_W};
 use snes_emu::snes::{self, Snes};
 use std::collections::VecDeque;
+use std::sync::atomic::{AtomicBool, AtomicU16, Ordering};
 use std::sync::{Arc, Mutex};
+use std::thread;
+use std::time::{Duration, Instant};
 
 /// 32kHz ステレオのエミュレータ出力をデバイスレートへ線形補間しながら流す
 struct AudioOut {
@@ -138,51 +141,85 @@ fn main() {
     .expect("ウィンドウの作成に失敗");
     window.set_target_fps(60);
 
-    let audio = AudioOut::new();
-    if audio.is_none() {
-        eprintln!("音声デバイスが見つかりません (無音で続行)");
-    }
-
     // 音声駆動ペーシング: オーディオキューの残量が 100ms を下回らないように
     // エミュレーションを進める (バッファ枯渇によるノイズを防ぐ)
     const AUDIO_TARGET: usize = 3200; // ステレオペア数 (32kHz × 100ms)
 
-    let save_sram = |snes: &Snes| {
-        if !snes.bus.cart.sram.is_empty() {
-            if let Err(e) = std::fs::write(&srm_path, &snes.bus.cart.sram) {
-                eprintln!("セーブデータ書き込み失敗: {e}");
-            }
-        }
-    };
+    // エミュレーションは専用スレッドで回す。macOS では Spaces のスワイプ切り替え中に
+    // メインスレッド (Cocoa イベントループ) が数百 ms ブロックされるため、
+    // メインループ駆動だとオーディオキューが枯渇して音が途切れる。
+    let shared_fb = Arc::new(Mutex::new(vec![0u32; SCREEN_W * SCREEN_H]));
+    let shared_joy = Arc::new(AtomicU16::new(0));
+    let running = Arc::new(AtomicBool::new(true));
 
-    let mut frame_count: u64 = 0;
-    while window.is_open() && !window.is_key_down(Key::Escape) {
-        let joy = read_joypad(&window);
-        match &audio {
-            Some(a) => {
-                let mut safety = 0;
-                while a.queued() < AUDIO_TARGET && safety < 16 {
-                    snes.run_frame(joy);
-                    a.push(&snes.bus.apu.take_samples());
-                    safety += 1;
+    let emu_thread = {
+        let shared_fb = shared_fb.clone();
+        let shared_joy = shared_joy.clone();
+        let running = running.clone();
+        thread::spawn(move || {
+            // cpal::Stream は Send でないため、ストリームもこのスレッド内で作る
+            let audio = AudioOut::new();
+            if audio.is_none() {
+                eprintln!("音声デバイスが見つかりません (無音で続行)");
+            }
+
+            let save_sram = |snes: &Snes| {
+                if !snes.bus.cart.sram.is_empty() {
+                    if let Err(e) = std::fs::write(&srm_path, &snes.bus.cart.sram) {
+                        eprintln!("セーブデータ書き込み失敗: {e}");
+                    }
+                }
+            };
+
+            let mut frame_count: u64 = 0;
+            let mut next_frame = Instant::now();
+            while running.load(Ordering::Relaxed) {
+                let joy = shared_joy.load(Ordering::Relaxed);
+                match &audio {
+                    Some(a) => {
+                        if a.queued() >= AUDIO_TARGET {
+                            thread::sleep(Duration::from_millis(2));
+                            continue;
+                        }
+                        snes.run_frame(joy);
+                        a.push(&snes.bus.apu.take_samples());
+                    }
+                    None => {
+                        // 音声なしのときは 60fps 相当の時間駆動でペーシングする
+                        let now = Instant::now();
+                        if next_frame > now {
+                            thread::sleep(next_frame - now);
+                        } else {
+                            next_frame = now;
+                        }
+                        next_frame += Duration::from_nanos(16_666_667);
+                        snes.run_frame(joy);
+                        snes.bus.apu.take_samples();
+                    }
+                }
+                shared_fb.lock().unwrap().copy_from_slice(snes.framebuffer());
+
+                // 10 秒ごとに SRAM を自動保存
+                frame_count += 1;
+                if frame_count % 600 == 0 {
+                    save_sram(&snes);
                 }
             }
-            None => {
-                snes.run_frame(joy);
-                snes.bus.apu.take_samples();
-            }
-        }
-        window
-            .update_with_buffer(snes.framebuffer(), SCREEN_W, SCREEN_H)
-            .expect("画面更新に失敗");
-
-        // 10 秒ごとに SRAM を自動保存
-        frame_count += 1;
-        if frame_count % 600 == 0 {
             save_sram(&snes);
-        }
+        })
+    };
+
+    // メインスレッドは入力の読み取りと画面表示のみ
+    let mut display = vec![0u32; SCREEN_W * SCREEN_H];
+    while window.is_open() && !window.is_key_down(Key::Escape) {
+        shared_joy.store(read_joypad(&window), Ordering::Relaxed);
+        display.copy_from_slice(&shared_fb.lock().unwrap());
+        window
+            .update_with_buffer(&display, SCREEN_W, SCREEN_H)
+            .expect("画面更新に失敗");
     }
-    save_sram(&snes);
+    running.store(false, Ordering::Relaxed);
+    emu_thread.join().expect("エミュレーションスレッドが異常終了");
 }
 
 /// キー割り当て (SNES パッドの菱形配置を IJKL に対応させている):
