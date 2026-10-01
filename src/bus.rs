@@ -177,8 +177,10 @@ impl MainBus {
         self.joy_auto[1] = self.joy2;
         self.joy_auto[2] = 0;
         self.joy_auto[3] = 0;
-        self.joy1_shift = (self.joy1 as u32) << 16;
-        self.joy2_shift = (self.joy2 as u32) << 16;
+        // 自動読み取りはコントローラのシフトレジスタを 16 クロック消費するので、
+        // 以降の $4016/$4017 シリアル読みは 1 を返す (DQ6 等はこれで接続判定する)
+        self.joy1_shift = 0xFFFF_FFFF;
+        self.joy2_shift = 0xFFFF_FFFF;
     }
 
     // ---- メモリルーティング -------------------------------------------------
@@ -233,8 +235,8 @@ impl MainBus {
                 0x4016 => {
                     let strobe = v & 1 != 0;
                     if self.joy_strobe && !strobe {
-                        self.joy1_shift = (self.joy1 as u32) << 16;
-                        self.joy2_shift = (self.joy2 as u32) << 16;
+                        self.joy1_shift = ((self.joy1 as u32) << 16) | 0xFFFF;
+                        self.joy2_shift = ((self.joy2 as u32) << 16) | 0xFFFF;
                     }
                     self.joy_strobe = strobe;
                 }
@@ -248,8 +250,8 @@ impl MainBus {
 
     fn joy_serial_read(&mut self, pad: usize) -> u8 {
         if self.joy_strobe {
-            self.joy1_shift = (self.joy1 as u32) << 16;
-            self.joy2_shift = (self.joy2 as u32) << 16;
+            self.joy1_shift = ((self.joy1 as u32) << 16) | 0xFFFF;
+            self.joy2_shift = ((self.joy2 as u32) << 16) | 0xFFFF;
         }
         let shift = if pad == 0 {
             &mut self.joy1_shift

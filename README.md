@@ -53,10 +53,12 @@ Linux / macOS (Intel・Apple Silicon) / Windows の4種のバイナリが
 
 | SNES | キー | SNES | キー |
 |------|------|------|------|
-| 十字キー | カーソルキー | B | Z |
-| A | X | Y | A |
-| X | S | L / R | Q / W |
+| 十字キー | WASD / カーソルキー | B (下) | K (または Z) |
+| A (右) | L (または X) | Y (左) | J |
+| X (上) | I | L / R | U / O |
 | Start | Enter | Select | 右 Shift |
+
+ボタン4つ (I/J/K/L) は SNES パッドの菱形配置と同じ並びです。
 
 ESC で終了。ウィンドウは自由にリサイズ可能 (アスペクト比維持)。
 フルスクリーンは macOS では緑ボタン、Windows/Linux では最大化で。

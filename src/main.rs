@@ -185,9 +185,10 @@ fn main() {
     save_sram(&snes);
 }
 
-/// キー割り当て:
-///   十字キー: カーソルキー / B: Z / A: X / Y: A / X: S
-///   L: Q / R: W / Start: Enter / Select: 右 Shift
+/// キー割り当て (SNES パッドの菱形配置を IJKL に対応させている):
+///   十字キー: WASD / カーソルキー
+///   B: K (下) / A: L (右) / Y: J (左) / X: I (上)  (Z/X も B/A として使用可)
+///   L: U / R: O / Start: Enter / Select: 右 Shift
 fn read_joypad(window: &Window) -> u16 {
     let mut joy = 0u16;
     let map: &[(Key, u16)] = &[
@@ -195,12 +196,18 @@ fn read_joypad(window: &Window) -> u16 {
         (Key::Down, snes::JOY_DOWN),
         (Key::Left, snes::JOY_LEFT),
         (Key::Right, snes::JOY_RIGHT),
-        (Key::Z, snes::JOY_B),
+        (Key::W, snes::JOY_UP),
+        (Key::S, snes::JOY_DOWN),
+        (Key::A, snes::JOY_LEFT),
+        (Key::D, snes::JOY_RIGHT),
+        (Key::K, snes::JOY_B),
+        (Key::L, snes::JOY_A),
+        (Key::J, snes::JOY_Y),
+        (Key::I, snes::JOY_X),
+        (Key::Z, snes::JOY_B), // 旧割り当ての互換
         (Key::X, snes::JOY_A),
-        (Key::A, snes::JOY_Y),
-        (Key::S, snes::JOY_X),
-        (Key::Q, snes::JOY_L),
-        (Key::W, snes::JOY_R),
+        (Key::U, snes::JOY_L),
+        (Key::O, snes::JOY_R),
         (Key::Enter, snes::JOY_START),
         (Key::RightShift, snes::JOY_SELECT),
     ];
